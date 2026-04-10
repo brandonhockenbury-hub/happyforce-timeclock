@@ -1,1 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HappyForce Timeclock</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f0f4f8; min-height: 100vh;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 24px 16px;
+  }
+  .app { width: 100%; max-width: 420px; }
+  .header { text-align: center; margin-bottom: 24px; }
+  .brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: #1D9E75; color: #fff;
+    padding: 10px 22px; border-radius: 50px; margin-bottom: 8px;
+  }
+  .brand-icon { width: 22px; height: 22px; fill: #fff; }
+  .brand-name { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+  .brand-sub { font-size: 13px; color: #5F5E5A; font-weight: 500; }
+  .card {
+    background: #fff; border-radius: 16px;
+    border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1px; color: #888780; margin-bottom: 14px;
+  }
+  .time-display { text-align: center; padding: 12px 0 16px; }
+  .live-clock {
+    font-size: 42px; font-weight: 700; color: #1a202c;
+    letter-spacing: -1px; font-variant-numeric: tabular-nums;
+  }
+  .live-date { font-size: 14px; color: #888780; margin-top: 4px; }
+  .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn {
+    padding: 14px 10px; border-radius: 12px; border: none;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+  .btn-in        { background: #1D9E75; color: #fff; }
+  .btn-out       { background: #e53e3e; color: #fff; }
+  .btn-lunch-out { background: #ED8936; color: #fff; }
+  .btn-lunch-in  { background: #3182CE; color: #fff; }
+  .btn-icon  { font-size: 20px; }
+  .btn-label { font-size: 13px; }
+  .log-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 0.5px solid #f0f4f8; font-size: 14px;
+  }
+  .log-row:last-child { border-bottom: none; }
+  .log-label { color: #5F5E5A; font-weight: 500; }
+  .log-time { font-weight: 600; color: #1a202c; font-variant-numeric: tabular-nums; }
+  .log-time.pending { color: #b0b0b0; font-style: italic; font-weight: 400; }
+  .summary-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 0 0; margin-top: 10px; border-top: 1.5px solid #f0f4f8;
+  }
+  .summary-label { font-size: 13px; font-weight: 600; color: #5F5E5A; text-transform: uppercase; letter-spacing: 0.5px; }
+  .summary-value { font-size: 22px; font-weight: 700; color: #1D9E75; font-variant-numeric: tabular-nums; }
+  .tech-name-row {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+  }
+  .tech-name { font-size: 15px; font-weight: 600; color: #1a202c; }
+  .change-name { font-size: 12px; color: #888780; cursor: pointer; text-decoration: underline; }
+  .status-badge {
+    display: inline-block; font-size: 11px; font-weight: 600;
+    padding: 3px 10px; border-radius: 20px; margin-bottom: 12px;
+  }
+  .status-clocked-in  { background: #EAF3DE; color: #3B6D11; }
+  .status-clocked-out { background: #FCEBEB; color: #A32D2D; }
+  .status-on-lunch    { background: #FFF3E0; color: #854F0B; }
+  .status-idle        { background: #f0f4f8; color: #888780; }
+  .status-row { text-align: center; margin-bottom: 2px; }
+  .bottom-btns { display: flex; flex-direction: column; gap: 10px; }
+  .export-btn {
+    width: 100%; padding: 14px; border-radius: 12px; border: none;
+    background: #1D9E75; color: #fff; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: opacity 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .export-btn:hover { opacity: 0.9; }
+  .export-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .reset-btn {
+    width: 100%; padding: 12px; border: 1.5px solid #e2e8f0;
+    border-radius: 10px; background: transparent; color: #888780;
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s;
+  }
+  .reset-btn:hover { background: #f7fafc; color: #5F5E5A; }
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px;
+  }
+  .overlay.hidden { display: none; }
+  .modal {
+    background: #fff; border-radius: 20px; padding: 28px 24px;
+    width: 100%; max-width: 360px; text-align: center;
+  }
+  .modal h2 { font-size: 18px; font-weight: 700; margin-bottom: 6px; color: #1a202c; }
+  .modal p  { font-size: 14px; color: #888780; margin-bottom: 20px; }
+  .modal input {
+    width: 100%; padding: 12px 14px; border-radius: 10px;
+    border: 1.5px solid #e2e8f0; font-size: 16px; margin-bottom: 14px;
+    outline: none; transition: border-color 0.15s;
+  }
+  .modal input:focus { border-color: #1D9E75; }
+  .modal-btn {
+    width: 100%; padding: 13px; border-radius: 10px; border: none;
+    background: #1D9E75; color: #fff; font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: opacity 0.15s;
+  }
+  .modal-btn:hover { opacity: 0.9; }
+</style>
+</head>
+<body>
 
+<div class="overlay" id="nameOverlay">
+  <div class="modal">
+    <div style="margin-bottom:14px;">
+      <div style="display:inline-flex;align-items:center;gap:8px;background:#1D9E75;color:#fff;padding:8px 18px;border-radius:40px;">
+        <svg width="18" height="18" fill="#fff" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
+        <span style="font-weight:700;font-size:15px;">HappyForce</span>
+      </div>
+    </div>
+    <h2>Welcome!</h2>
+    <p>Enter your name to get started. This will be saved on your device.</p>
+    <input type="text" id="nameInput" placeholder="Your full name" maxlength="60"
+      onkeydown="if(event.key==='Enter') saveName()" />
+    <button class="modal-btn" onclick="saveName()">Get Started</button>
+  </div>
+</div>
+
+<div class="app" id="mainApp" style="display:none;">
+  <div class="header">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
+      <span class="brand-name">HappyForce</span>
+    </div>
+    <div class="brand-sub">Technician Timeclock</div>
+  </div>
+
+  <div class="card">
+    <div class="tech-name-row">
+      <span class="tech-name" id="techNameDisplay"></span>
+      <span class="change-name" onclick="changeName()">change name</span>
+    </div>
+    <div class="time-display">
+      <div class="live-clock" id="liveClock">--:--:--</div>
+      <div class="live-date" id="liveDate">--</div>
+    </div>
+    <div class="status-row">
+      <span class="status-badge status-idle" id="statusBadge">Not clocked in</span>
+    </div>
+    <div class="action-grid">
+      <button class="btn btn-in"        id="btnClockIn"  onclick="clockIn()">
+        <span class="btn-icon">▶</span><span class="btn-label">Clock In</span>
+      </button>
+      <button class="btn btn-out"       id="btnClockOut" onclick="clockOut()" disabled>
+        <span class="btn-icon">■</span><span class="btn-label">Clock Out</span>
+      </button>
+      <button class="btn btn-lunch-out" id="btnLunchOut" onclick="lunchOut()" disabled>
+        <span class="btn-icon">🍽</span><span class="btn-label">Lunch Out</span>
+      </button>
+      <button class="btn btn-lunch-in"  id="btnLunchIn"  onclick="lunchIn()"  disabled>
+        <span class="btn-icon">↩</span><span class="btn-label">Lunch In</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Today's Log</div>
+    <div class="log-row"><span class="log-label">Clock In</span>  <span class="log-time pending" id="logClockIn">—</span></div>
+    <div class="log-row"><span class="log-label">Lunch Out</span> <span class="log-time pending" id="logLunchOut">—</span></div>
+    <div class="log-row"><span class="log-label">Lunch In</span>  <span class="log-time pending" id="logLunchIn">—</span></div>
+    <div class="log-row"><span class="log-label">Clock Out</span> <span class="log-time pending" id="logClockOut">—</span></div>
+    <div class="summary-row">
+      <span class="summary-label">Total Worked</span>
+      <span class="summary-value" id="totalWorked">0h 0m</span>
+    </div>
+  </div>
+
+  <div class="bottom-btns">
+    <button class="export-btn" id="exportBtn" onclick="exportCSV()" disabled>
+      <svg width="16" height="16" fill="#fff" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5v-2z"/></svg>
+      Export to CSV
+    </button>
+    <button class="reset-btn" onclick="confirmReset()">Reset for New Day</button>
+  </div>
+</div>
+
+<script>
+  const KEY      = 'hf_tc_v2';
+  const NAME_KEY = 'hf_tc_name';
+
+  let state    = loadState();
+  let techName = localStorage.getItem(NAME_KEY) || '';
+
+  function loadState() {
+    try { const r = localStorage.getItem(KEY); if (r) return JSON.parse(r); } catch(e) {}
+    return { clockIn:null, lunchOut:null, lunchIn:null, clockOut:null };
+  }
+  function saveState() { localStorage.setItem(KEY, JSON.stringify(state)); }
+
+  function fmt(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    let h = d.getHours(), m = d.getMinutes();
+    const ap = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${String(m).padStart(2,'0')} ${ap}`;
+  }
+
+  function fmtCSV(ts) { return ts ? fmt(ts) : ''; }
+
+  function calcWorked() {
+    if (!state.clockIn) return 0;
+    const end = state.clockOut || Date.now();
+    let w = end - state.clockIn;
+    if (state.lunchOut && state.lunchIn) w -= (state.lunchIn - state.lunchOut);
+    else if (state.lunchOut && !state.lunchIn) w -= (Date.now() - state.lunchOut);
+    return Math.max(0, w);
+  }
+
+  function fmtDuration(ms) {
+    if (ms <= 0) return '0h 0m';
+    const t = Math.floor(ms / 60000);
+    return `${Math.floor(t/60)}h ${t%60}m`;
+  }
+
+  function todayDate() {
+    return new Date().toLocaleDateString('en-US', {month:'2-digit', day:'2-digit', year:'numeric'});
+  }
+
+  function render() {
+    const s = state;
+    const fields = [
+      [s.clockIn,  'logClockIn'],
+      [s.lunchOut, 'logLunchOut'],
+      [s.lunchIn,  'logLunchIn'],
+      [s.clockOut, 'logClockOut']
+    ];
+    fields.forEach(([ts, id]) => {
+      const el = document.getElementById(id);
+      el.textContent = fmt(ts);
+      el.classList.toggle('pending', !ts);
+    });
+    document.getElementById('totalWorked').textContent = fmtDuration(calcWorked());
+
+    const badge = document.getElementById('statusBadge');
+    const ci = document.getElementById('btnClockIn');
+    const co = document.getElementById('btnClockOut');
+    const lo = document.getElementById('btnLunchOut');
+    const li = document.getElementById('btnLunchIn');
+    const ex = document.getElementById('exportBtn');
+
+    if (!s.clockIn) {
+      badge.textContent = 'Not clocked in'; badge.className = 'status-badge status-idle';
+      ci.disabled=false; co.disabled=true; lo.disabled=true; li.disabled=true; ex.disabled=true;
+    } else if (s.clockOut) {
+      badge.textContent = 'Clocked out'; badge.className = 'status-badge status-clocked-out';
+      ci.disabled=true; co.disabled=true; lo.disabled=true; li.disabled=true; ex.disabled=false;
+    } else if (s.lunchOut && !s.lunchIn) {
+      badge.textContent = 'On lunch'; badge.className = 'status-badge status-on-lunch';
+      ci.disabled=true; co.disabled=true; lo.disabled=true; li.disabled=false; ex.disabled=true;
+    } else {
+      badge.textContent = 'Clocked in'; badge.className = 'status-badge status-clocked-in';
+      ci.disabled=true; co.disabled=false; lo.disabled=!!s.lunchIn; li.disabled=true; ex.disabled=true;
+    }
+  }
+
+  function clockIn()  { state.clockIn  = Date.now(); saveState(); render(); }
+  function clockOut() { state.clockOut = Date.now(); saveState(); render(); }
+  function lunchOut() { state.lunchOut = Date.now(); saveState(); render(); }
+  function lunchIn()  { state.lunchIn  = Date.now(); saveState(); render(); }
+
+  function exportCSV() {
+    const rows = [
+      ['Name','Date','Clock In','Lunch Start','Lunch End','Clock Out','Total Hours'],
+      [
+        techName,
+        todayDate(),
+        fmtCSV(state.clockIn),
+        fmtCSV(state.lunchOut),
+        fmtCSV(state.lunchIn),
+        fmtCSV(state.clockOut),
+        fmtDuration(calcWorked())
+      ]
+    ];
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const dateStr = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'-');
+    a.href     = url;
+    a.download = `HappyForce_${techName.replace(/\s+/g,'_')}_${dateStr}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function confirmReset() {
+    if (confirm('Reset for a new day? This will clear today\'s log.')) {
+      state = { clockIn:null, lunchOut:null, lunchIn:null, clockOut:null };
+      saveState(); render();
+    }
+  }
+
+  function saveName() {
+    const v = document.getElementById('nameInput').value.trim();
+    if (!v) { alert('Please enter your name.'); return; }
+    techName = v;
+    localStorage.setItem(NAME_KEY, v);
+    document.getElementById('nameOverlay').classList.add('hidden');
+    document.getElementById('mainApp').style.display = '';
+    document.getElementById('techNameDisplay').textContent = v;
+    render();
+  }
+
+  function changeName() {
+    document.getElementById('nameInput').value = techName;
+    document.getElementById('nameOverlay').classList.remove('hidden');
+    document.getElementById('mainApp').style.display = 'none';
+  }
+
+  function tickClock() {
+    const now = new Date();
+    let h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+    const ap = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    document.getElementById('liveClock').textContent = `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')} ${ap}`;
+    document.getElementById('liveDate').textContent = now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+    if (state.clockIn && !state.clockOut) document.getElementById('totalWorked').textContent = fmtDuration(calcWorked());
+  }
+
+  if (techName) {
+    document.getElementById('nameOverlay').classList.add('hidden');
+    document.getElementById('mainApp').style.display = '';
+    document.getElementById('techNameDisplay').textContent = techName;
+  }
+
+  render();
+  tickClock();
+  setInterval(tickClock, 1000);
+</script>
+</body>
+</html>
