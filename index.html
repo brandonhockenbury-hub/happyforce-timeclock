@@ -196,8 +196,9 @@
 </div>
 
 <script>
-  const KEY      = 'hf_tc_v2';
-  const NAME_KEY = 'hf_tc_name';
+  const KEY       = 'hf_tc_v2';
+  const NAME_KEY  = 'hf_tc_name';
+  const WEBHOOK   = 'https://hooks.zapier.com/hooks/catch/27173503/u7w9mio/';
 
   let state    = loadState();
   let techName = localStorage.getItem(NAME_KEY) || '';
@@ -275,10 +276,27 @@
     }
   }
 
-  function clockIn()  { state.clockIn  = Date.now(); saveState(); render(); }
-  function clockOut() { state.clockOut = Date.now(); saveState(); render(); }
-  function lunchOut() { state.lunchOut = Date.now(); saveState(); render(); }
-  function lunchIn()  { state.lunchIn  = Date.now(); saveState(); render(); }
+  async function syncToZapier() {
+    try {
+      await fetch(WEBHOOK, {
+        method: 'POST',
+        body: JSON.stringify({
+          name:        techName,
+          date:        todayDate(),
+          clock_in:    fmtCSV(state.clockIn),
+          lunch_start: fmtCSV(state.lunchOut),
+          lunch_end:   fmtCSV(state.lunchIn),
+          clock_out:   fmtCSV(state.clockOut),
+          total_hours: fmtDuration(calcWorked())
+        })
+      });
+    } catch(e) { console.error('Zapier sync failed', e); }
+  }
+
+  function clockIn()  { state.clockIn  = Date.now(); saveState(); render(); syncToZapier(); }
+  function clockOut() { state.clockOut = Date.now(); saveState(); render(); syncToZapier(); }
+  function lunchOut() { state.lunchOut = Date.now(); saveState(); render(); syncToZapier(); }
+  function lunchIn()  { state.lunchIn  = Date.now(); saveState(); render(); syncToZapier(); }
 
   function exportCSV() {
     const rows = [
